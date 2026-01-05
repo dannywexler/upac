@@ -1,11 +1,6 @@
-export function greet(name: string) {
-    return `Hello ${name}`
-}
+#!/usr/bin/env node
 
-if (import.meta.vitest) {
-    const { it, expect } = import.meta.vitest
+import { cli } from "./cli"
+import { runWithValidConfig } from "./config/config.impl"
 
-    it("Can test right in source code", () => {
-        expect(greet("Name")).toEqual("Hello Name")
-    })
-}
+runWithValidConfig(() => cli.parse())

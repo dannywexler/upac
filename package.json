@@ -1,13 +1,17 @@
 {
-    "name": "PACKAGE_NAME",
+    "name": "upac",
     "version": "0.1.0",
-    "description": "DESCRIBE PACKAGE",
+    "description": "Universal Package Manager and dotfile syncing cli",
+    "bin": "./dist/index.js",
     "keywords": [
-        "ADD KEYWORDS"
+        "universal",
+        "package manager",
+        "dotfiles",
+        "cli"
     ],
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/dannywexler/PACKAGE_NAME.git"
+        "url": "git+https://github.com/dannywexler/upac.git"
     },
     "author": "Danny Wexler",
     "license": "MIT",
@@ -15,20 +19,12 @@
     "engines": {
         "node": ">=20.0.0"
     },
-    "exports": {
-        ".": {
-            "import": "./dist/index.js",
-            "default": "./dist/index.js"
-        }
-    },
-    "main": "./dist/index.js",
-    "module": "./dist/index.js",
-    "types": "./dist/index.d.ts",
     "files": [
         "dist"
     ],
     "devDependencies": {
         "@biomejs/biome": "2.2.6",
+        "@types/node": "^25.0.3",
         "lefthook": "^1.13.6",
         "tsdown": "^0.12.9",
         "typescript": "^5.9.3",
@@ -38,5 +34,12 @@
     "scripts": {
         "build": "lefthook run build",
         "test:watch": "vitest"
+    },
+    "dependencies": {
+        "clerc": "1.1.1",
+        "fluent-command": "^0.1.4",
+        "fluent-file": "0.2.2",
+        "zerde": "0.1.4",
+        "zod": "^4.3.5"
     }
 }
