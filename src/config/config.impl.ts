@@ -9,7 +9,8 @@ import { logError, logFatal } from "$/logging"
 import type { UpacConfig } from "./config.schema"
 import { upacConfigSchema } from "./config.schema"
 
-export const upacConfigFile = configFolder("upac")
+export const upacConfigFolder = configFolder("upac")
+export const upacConfigFile = upacConfigFolder
     .file("upac.config.json")
     .schema(upacConfigSchema)
 
@@ -26,6 +27,11 @@ export function useUpacConfig() {
 }
 
 export async function runWithValidConfig(cb: () => void) {
+    const config = await mustReadConfig()
+    upacConfigLocalStorage.run(config, cb)
+}
+
+export async function mustReadConfig() {
     const configExists = await upacConfigFile.exists()
     if (!configExists) {
         logFatal(
@@ -47,6 +53,15 @@ export async function runWithValidConfig(cb: () => void) {
             logFatal(z.prettifyError(upacConfigError))
         }
     } else {
-        upacConfigLocalStorage.run(upacConfigResult.value, cb)
+        return upacConfigResult.value
     }
+}
+
+export async function mustWriteConfig(config: UpacConfig) {
+    const writeResult = await upacConfigFile.write(config)
+    if (writeResult.isOk()) {
+        return
+    }
+    logError(`Error writing UPAC config file at path: ${upacConfigFilePath}`)
+    logFatal(writeResult.error)
 }
