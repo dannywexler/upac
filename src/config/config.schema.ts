@@ -11,19 +11,9 @@ export const upacPackageManagerSchema = z.object({
     install: z.array(z.string()).min(1),
 })
 
-export const upacProgramConfigSchema = z.boolean().or(
-    z
-        .object({
-            destination: z.string(),
-        })
-        .partial(),
-)
-
 export const upacProfileSchema = z.object({
     packageManager: z.string(),
-    programs: z
-        .record(z.string(), upacProgramConfigSchema)
-        .refine(...nonEmptyRecord),
+    programs: z.record(z.string(), z.string()).refine(...nonEmptyRecord),
 })
 
 export const upacConfigSchema = z

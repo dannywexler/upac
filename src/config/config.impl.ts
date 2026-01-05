@@ -5,11 +5,13 @@ import { ParseError } from "zerde"
 import z from "zod"
 
 import { logError, logFatal } from "$/logging"
+import { expectResult } from "$/utils"
 
 import type { UpacConfig } from "./config.schema"
 import { upacConfigSchema } from "./config.schema"
 
 export const upacConfigFolder = configFolder("upac")
+export const upacProgramsFolder = upacConfigFolder.folder("programs")
 export const upacConfigFile = upacConfigFolder
     .file("upac.config.json")
     .schema(upacConfigSchema)
@@ -38,30 +40,19 @@ export async function mustReadConfig() {
             `UPAC config file was not found at path: ${upacConfigFilePath}`,
         )
     }
-    const upacConfigResult = await upacConfigFile.read()
-    if (upacConfigResult.isErr()) {
-        logError(
-            `Error reading UPAC config file at path: ${upacConfigFilePath}`,
-        )
-        const upacConfigError = upacConfigResult.error
-        if (
-            upacConfigError instanceof FileReadError ||
-            upacConfigError instanceof ParseError
-        ) {
-            logFatal(upacConfigError)
-        } else {
-            logFatal(z.prettifyError(upacConfigError))
+    return await expectResult(upacConfigFile.read(), (err) => {
+        const baseMsg = `Error reading UPAC config file at path: ${upacConfigFilePath}`
+        if (err instanceof FileReadError || err instanceof ParseError) {
+            return baseMsg
         }
-    } else {
-        return upacConfigResult.value
-    }
+        logError(baseMsg)
+        logFatal(z.prettifyError(err))
+    })
 }
 
 export async function mustWriteConfig(config: UpacConfig) {
-    const writeResult = await upacConfigFile.write(config)
-    if (writeResult.isOk()) {
-        return
-    }
-    logError(`Error writing UPAC config file at path: ${upacConfigFilePath}`)
-    logFatal(writeResult.error)
+    await expectResult(
+        upacConfigFile.write(config),
+        () => `Error writing UPAC config file at path: ${upacConfigFilePath}`,
+    )
 }

@@ -1,9 +1,16 @@
+import { platform } from "node:os"
+
+import { configFolder, folder } from "fluent-file"
 import { objectEntries, objectKeys } from "zerde"
 
-import { useUpacConfig } from "$/config/config.impl"
+import {
+    upacConfigFolder,
+    upacProgramsFolder,
+    useUpacConfig,
+} from "$/config/config.impl"
 import { installAProgram } from "$/lib/install"
-import { logFatal, logInfo, MUST } from "$/logging"
-import { programExists } from "$/utils"
+import { logFatal, logInfo, logWarning, MUST } from "$/logging"
+import { expectResult, programExists } from "$/utils"
 
 export async function syncCommand(profileName?: string) {
     const { profiles, packageManagers } = useUpacConfig()
@@ -40,16 +47,10 @@ export async function syncCommand(profileName?: string) {
         `"${packageManager}" to be installed!`,
     )
 
-    for (const [index, [programName, programConfig]] of objectEntries(
-        programs,
-    ).entries()) {
-        if (typeof programConfig === "boolean") {
-            if (programConfig === false) {
-                continue
-            }
-        }
+    let index = 1
+    for (const [programName, programDestination] of objectEntries(programs)) {
         logInfo(
-            `Syncing program ${(index + 1).toString().padStart(2)} of ${totalProgramsToSync}: ${programName}`,
+            `Syncing program ${(index++).toString().padStart(2)} of ${totalProgramsToSync}: ${programName}`,
         )
         await installAProgram({
             programName,
@@ -57,5 +58,46 @@ export async function syncCommand(profileName?: string) {
             installArgs: resolvedPackageManagerConfig.install,
             profileName: resolvedProfileName,
         })
+
+        const programFolder = upacProgramsFolder.folder(programName)
+        const programFolderExists = await programFolder.exists()
+        if (!programFolderExists) {
+            logInfo(`${programName} does not have any files to sync`)
+            continue
+        }
+
+        const resolvedDestination =
+            programDestination.length === 0
+                ? configFolder(programName)
+                : folder(programDestination)
+
+        const foundFiles = await expectResult(
+            programFolder.findFiles(),
+            () => `Error searching for files in: ${programFolder.path}`,
+        )
+        if (foundFiles.length === 0) {
+            logWarning(`${programFolder.path} is an empty folder. Skipping.`)
+        }
+
+        for (const foundFile of foundFiles) {
+            const relative = foundFile.relativePath(upacConfigFolder)
+            if (platform() === "win32") {
+                await expectResult(
+                    foundFile.copyTo(resolvedDestination),
+                    () =>
+                        `Error copying ${foundFile.path()} into ${resolvedDestination.path}`,
+                )
+                logInfo(`${relative}  COPIED INTO  ${resolvedDestination.path}`)
+            } else {
+                await expectResult(
+                    foundFile.symlinkTo(resolvedDestination),
+                    () =>
+                        `Error symlinking ${foundFile.path()} into ${resolvedDestination.path}`,
+                )
+                logInfo(
+                    `${relative}  SYMLINKED INTO  ${resolvedDestination.path}`,
+                )
+            }
+        }
     }
 }

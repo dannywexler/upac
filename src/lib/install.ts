@@ -1,8 +1,8 @@
 import { fcmd } from "fluent-command"
 import { objectKeys } from "zerde"
 
-import { mustWriteConfig, useUpacConfig } from "$/config/config.impl"
-import { logError, logInfo, logSuccess, MUST } from "$/logging"
+import { useUpacConfig } from "$/config/config.impl"
+import { logError, logFatal, logInfo, logSuccess, MUST } from "$/logging"
 import { programExists } from "$/utils"
 
 export type InstallAProgramOptions = {
@@ -33,12 +33,10 @@ export async function installAProgram({
         const { code, output } = installResult.error
 
         logError(`Failed to install ${programName}. Got exit code: ${code}`)
-        logError(output)
-        process.exit(1)
+        logFatal(output)
     }
     logSuccess(`Installed  ${programName}`)
-    // TODO: merge the newly installed program into the upac.config.json file
-    // need to ensure to only add an entry if one does not already exist
+
     const existingConfig = useUpacConfig()
     const profileConfig = existingConfig.profiles[profileName]
     MUST(profileConfig, "profileConfig")
@@ -48,19 +46,22 @@ export async function installAProgram({
     if (alreadyPresentPrograms.includes(programName)) {
         return
     }
-    logInfo(`Adding ${programName} to profile ${profileName}`)
-    await mustWriteConfig({
-        ...existingConfig,
-        profiles: {
-            ...existingConfig.profiles,
-            [profileName]: {
-                ...profileConfig,
-                programs: {
-                    ...profileConfig.programs,
-                    [programName]: true,
-                },
-            },
-        },
-    })
-    logInfo(`Added  ${programName} to profile ${profileName}`)
+
+    // TODO: Enable this section when adding install command, don't need it for now
+
+    // logInfo(`Adding ${programName} to profile ${profileName}`)
+    // await mustWriteConfig({
+    //     ...existingConfig,
+    //     profiles: {
+    //         ...existingConfig.profiles,
+    //         [profileName]: {
+    //             ...profileConfig,
+    //             programs: {
+    //                 ...profileConfig.programs,
+    //                 [programName]: "",
+    //             },
+    //         },
+    //     },
+    // })
+    // logInfo(`Added  ${programName} to profile ${profileName}`)
 }
