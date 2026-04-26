@@ -11,10 +11,11 @@ import type { UpacConfig } from "./config.schema"
 import { upacConfigSchema } from "./config.schema"
 
 export const upacConfigFolder = configFolder("upac")
-export const upacProgramsFolder = upacConfigFolder.folder("programs")
+export const upacPackagesFolder = upacConfigFolder.folder("packages")
 export const upacConfigFile = upacConfigFolder
     .file("upac.config.json")
     .schema(upacConfigSchema)
+export const upacVariablesFile = upacConfigFolder.file("variables.json.liquid")
 
 const upacConfigFilePath = upacConfigFile.path()
 
@@ -28,9 +29,9 @@ export function useUpacConfig() {
     return upacConfig
 }
 
-export async function runWithValidConfig(cb: () => void) {
+export async function runWithValidConfig<T>(cb: () => Promise<T>) {
     const config = await mustReadConfig()
-    upacConfigLocalStorage.run(config, cb)
+    await upacConfigLocalStorage.run(config, cb)
 }
 
 export async function mustReadConfig() {
@@ -50,9 +51,9 @@ export async function mustReadConfig() {
     })
 }
 
-export async function mustWriteConfig(config: UpacConfig) {
-    await expectResult(
-        upacConfigFile.write(config),
-        () => `Error writing UPAC config file at path: ${upacConfigFilePath}`,
-    )
-}
+// export async function mustWriteConfig(config: UpacConfig) {
+//     await expectResult(
+//         upacConfigFile.write(config),
+//         () => `Error writing UPAC config file at path: ${upacConfigFilePath}`,
+//     )
+// }

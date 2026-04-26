@@ -1,103 +1,115 @@
-import { platform } from "node:os"
+import { configFolder } from "fluent-file"
 
-import { configFolder, folder } from "fluent-file"
-import { objectEntries, objectKeys } from "zerde"
-
+import { upacPackagesFolder, useUpacConfig } from "$/config/config.impl"
+import { installAPackage } from "$/lib/install"
 import {
-    upacConfigFolder,
-    upacProgramsFolder,
-    useUpacConfig,
-} from "$/config/config.impl"
-import { installAProgram } from "$/lib/install"
-import { logFatal, logInfo, logWarning, MUST } from "$/logging"
-import { expectResult, programExists } from "$/utils"
+    LIQUID_SUFFIX_LENGTH,
+    OS_INFO,
+    readVariablesFile,
+    safeRenderTemplate,
+} from "$/lib/templates"
+import { logInfo, logSuccess, logWarning } from "$/logging"
+import { expectResult, indent } from "$/utils"
 
-export async function syncCommand(profileName?: string) {
-    const { profiles, packageManagers } = useUpacConfig()
-    const allProfileNames = objectKeys(profiles)
-    if (allProfileNames.length > 1) {
-        // TODO: Handle more than 1 profile
-        logFatal("More than 1 profile is upcoming feature")
-    }
-    const firstProfile = allProfileNames.at(0)
-    MUST(firstProfile, "firstProfile")
-    const resolvedProfileName = profileName ?? firstProfile
-    const resolvedProfileConfig = profiles[resolvedProfileName]
-    MUST(
-        resolvedProfileConfig,
-        "profileNameToSync",
-        `${resolvedProfileName} to be one of the available profiles: ${allProfileNames.join(", ")}`,
-    )
-    const { packageManager, programs } = resolvedProfileConfig
-    const resolvedPackageManagerConfig = packageManagers[packageManager]
-    MUST(
-        resolvedPackageManagerConfig,
-        "package manager",
-        `${packageManager} to be one of the declared package managers: ${Object.keys(packageManagers).join(", ")}`,
-    )
+const leftPad = indent()
 
-    const totalProgramsToSync = Object.keys(programs).length
-    logInfo(
-        `Syncing ${totalProgramsToSync} programs of profile "${resolvedProfileName}" using package manager "${packageManager}"`,
-    )
-    const packageManagerExists = await programExists(packageManager)
-    MUST(
-        packageManagerExists,
-        "package manager",
-        `"${packageManager}" to be installed!`,
-    )
-
-    let index = 1
-    for (const [programName, programDestination] of objectEntries(programs)) {
+export async function syncCommand() {
+    await readVariablesFile()
+    const { packages } = useUpacConfig()
+    const totalPackages = packages.length
+    logInfo("Syncing", totalPackages, "packages")
+    for (const [
+        packageIndex,
+        { packageName, packageManager },
+    ] of packages.entries()) {
+        const packageIndexString = (packageIndex + 1)
+            .toString()
+            .padStart(totalPackages.toString().length)
         logInfo(
-            `Syncing program ${(index++).toString().padStart(2)} of ${totalProgramsToSync}: ${programName}`,
-        )
-        await installAProgram({
-            programName,
+            "Syncing package",
+            packageIndexString,
+            "of",
+            totalPackages,
+            packageName,
+            "using",
             packageManager,
-            installArgs: resolvedPackageManagerConfig.install,
-            profileName: resolvedProfileName,
-        })
+        )
+        await installAPackage(packageName)
 
-        const programFolder = upacProgramsFolder.folder(programName)
-        const programFolderExists = await programFolder.exists()
-        if (!programFolderExists) {
-            logInfo(`${programName} does not have any files to sync`)
+        const packageFolder = upacPackagesFolder.folder(packageName)
+        const packageFolderExists = await packageFolder.exists()
+        if (!packageFolderExists) {
+            // logWarning(`${leftPad}${packageName} does not have any files to sync`)
             continue
         }
+        const packageDestinationFolder = configFolder(packageName)
 
-        const resolvedDestination =
-            programDestination.length === 0
-                ? configFolder(programName)
-                : folder(programDestination)
+        logInfo(`Syncing dotfiles to ${packageDestinationFolder.path}:`)
 
         const foundFiles = await expectResult(
-            programFolder.findFiles(),
-            () => `Error searching for files in: ${programFolder.path}`,
+            packageFolder.findFiles(),
+            () => `Error searching for files in: ${packageFolder.path}`,
         )
         if (foundFiles.length === 0) {
-            logWarning(`${programFolder.path} is an empty folder. Skipping.`)
+            logWarning(`${packageFolder.path} is an empty folder. Skipping.`)
+        }
+
+        let longestFileName = 1
+        for (const foundFile of foundFiles) {
+            const len = foundFile
+                .path()
+                .slice(packageFolder.path.length + 1).length
+            if (len > longestFileName) {
+                longestFileName = len
+            }
         }
 
         for (const foundFile of foundFiles) {
-            const relative = foundFile.relativePath(upacConfigFolder)
-            if (platform() === "win32") {
-                await expectResult(
-                    foundFile.copyTo(resolvedDestination),
-                    () =>
-                        `Error copying ${foundFile.path()} into ${resolvedDestination.path}`,
+            const relative = foundFile
+                .path()
+                .slice(packageFolder.path.length + 1)
+                .padEnd(longestFileName + 2)
+
+            if (foundFile.ext() === "liquid") {
+                const foundFileText = await expectResult(
+                    foundFile.readText(),
+                    () => `${leftPad}Error reading ${foundFile.path()}`,
                 )
-                logInfo(`${relative}  COPIED INTO  ${resolvedDestination.path}`)
+                const renderedText = await expectResult(
+                    safeRenderTemplate(foundFileText),
+                    () => `${leftPad}Error rendering ${foundFile.path()}`,
+                )
+                const destinationFile = packageDestinationFolder.file(
+                    // use -1 to slice off ".liquid" from end of file path
+                    relative
+                        .trim()
+                        .slice(0, LIQUID_SUFFIX_LENGTH * -1),
+                )
+                await expectResult(
+                    destinationFile.writeText(renderedText),
+                    () => `${leftPad}Error writing ${foundFile.path()}`,
+                )
+                logSuccess(`${leftPad}${relative}RENDERED`)
+
+                continue
+            }
+
+            if (OS_INFO.isWindows) {
+                await expectResult(
+                    foundFile.copyTo(packageDestinationFolder),
+                    () =>
+                        `${leftPad}Error copying ${foundFile.path()} into ${packageDestinationFolder.path}`,
+                )
+                logSuccess(`${leftPad}${relative}COPIED`)
             } else {
                 await expectResult(
-                    foundFile.symlinkTo(resolvedDestination),
+                    foundFile.symlinkTo(packageDestinationFolder),
                     () =>
-                        `Error symlinking ${foundFile.path()} into ${resolvedDestination.path}`,
+                        `${leftPad}Error symlinking ${foundFile.path()} into ${packageDestinationFolder.path}`,
                 )
-                logInfo(
-                    `${relative}  SYMLINKED INTO  ${resolvedDestination.path}`,
-                )
+                logSuccess(`${leftPad}${relative}SYMLINKED`)
             }
         }
     }
+    logSuccess(`Synced ${totalPackages} packages`)
 }

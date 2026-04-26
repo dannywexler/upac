@@ -1,19 +1,12 @@
-import { Cli } from "clerc"
+import { Cli, friendlyErrorPlugin } from "clerc"
 
-import packageJson from "../package.json" with { type: "json" }
+import { name, version } from "../package.json" with { type: "json" }
 
 export const cli = Cli()
-    .scriptName(packageJson.name)
-    .version(packageJson.version)
-    .globalFlag("profile", "Profile to use", {
-        type: String,
-        short: "p",
-    })
-    .command("sync", "Sync config", {
-        alias: "s",
-    })
-    .on("sync", (ctx) => {
-        import("./commands/sync.cmd.ts").then((module) =>
-            module.syncCommand(ctx.flags.profile),
-        )
+    .scriptName(name)
+    .version(version)
+    .use(friendlyErrorPlugin())
+    .command("sync", "Sync config", { alias: "s" })
+    .on("sync", () => {
+        import("./commands/sync.cmd.ts").then((module) => module.syncCommand())
     })

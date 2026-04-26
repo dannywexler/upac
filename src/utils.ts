@@ -1,9 +1,8 @@
-import { platform } from "node:os"
-
 import { fcmd, SPAWN_MISSING_EXE_CODE } from "fluent-command"
 import type { ResultAsync } from "neverthrow"
 import { objectKeys } from "zerde"
 
+import { OS_INFO } from "./lib/templates"
 import { logError, logFatal } from "./logging"
 
 export function isEmptyObject<T extends Record<string, unknown>>(obj: T) {
@@ -14,16 +13,17 @@ export function isNonEmptyObject<T extends Record<string, unknown>>(obj: T) {
     return !isEmptyObject(obj)
 }
 
-export async function programExists(programName: string) {
-    const finder = platform() === "win32" ? "where" : "which"
-    return fcmd(finder, programName)
+const finder = OS_INFO.isWindows ? "where" : "which"
+
+export async function packageExists(packageName: string) {
+    return fcmd(finder, packageName)
         .read()
         .match(
             () => true,
             (commandError) => {
                 if (commandError.code === SPAWN_MISSING_EXE_CODE) {
                     logFatal(
-                        `Could not find the program finder command: "${finder}". Yo dawg.`,
+                        `Could not find the package finder command: "${finder}". Yo dawg.`,
                     )
                 }
                 return false
@@ -49,4 +49,8 @@ export async function expectResult<
         logFatal(result.error)
     }
     process.exit(1)
+}
+
+export function indent(amount = 4) {
+    return " ".repeat(amount)
 }

@@ -3,4 +3,4 @@
 import { cli } from "./cli"
 import { runWithValidConfig } from "./config/config.impl"
 
-runWithValidConfig(() => cli.parse())
+await runWithValidConfig(() => cli.parse())

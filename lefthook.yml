@@ -1,3 +1,9 @@
+check:
+  jobs:
+    - &CHECK
+      name: Check
+      run: "{nm}tsc"
+
 build:
   jobs:
     - &BUILD
@@ -20,6 +26,7 @@ test:
 all: &ALL
   piped: true
   jobs:
+    - *CHECK
     - *LINT
     - *BUILD
     # - *TEST
