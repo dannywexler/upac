@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks"
 
-import { configFolder, FileReadError } from "fluent-file"
+import { FileReadError, ffile, folder } from "fluent-file"
 import { ParseError } from "zerde"
 import z from "zod"
 
@@ -10,12 +10,9 @@ import { expectResult } from "$/utils"
 import type { UpacConfig } from "./config.schema"
 import { upacConfigSchema } from "./config.schema"
 
-export const upacConfigFolder = configFolder("upac")
-export const upacPackagesFolder = upacConfigFolder.folder("packages")
-export const upacConfigFile = upacConfigFolder
-    .file("upac.config.json")
-    .schema(upacConfigSchema)
-export const upacVariablesFile = upacConfigFolder.file("variables.json.liquid")
+export const upacPackagesFolder = folder("packages")
+export const upacConfigFile = ffile("upac.config.json").schema(upacConfigSchema)
+export const upacVariablesFile = ffile("upac.variables.yaml.liquid")
 
 const upacConfigFilePath = upacConfigFile.path()
 

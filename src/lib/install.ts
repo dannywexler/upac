@@ -1,8 +1,10 @@
 import { fcmd } from "fluent-command"
 
 import { useUpacConfig } from "$/config/config.impl"
-import { logError, logFatal, logSuccess, MUST } from "$/logging"
-import { packageExists } from "$/utils"
+import { logError, logFatal, logInfo, logSuccess, MUST } from "$/logging"
+import { indent, packageExists } from "$/utils"
+
+const leftPad = indent()
 
 export async function installAPackage(packageName: string) {
     const { packageManagers, packages } = useUpacConfig()
@@ -16,20 +18,20 @@ export async function installAPackage(packageName: string) {
     const alreadyExists = await packageExists(
         resolvedPackage.binary ?? packageName,
     )
-    if (alreadyExists) {
-        return logSuccess(`${packageName} already installed`)
-    }
+    if (!alreadyExists) {
+        logInfo("Installing", packageName)
 
-    const installResult = await fcmd(
-        resolvedPackage.packageManager,
-        ...resolvedPackageManager.install,
-        packageName,
-    ).read()
-    if (installResult.isErr()) {
-        const { code, output } = installResult.error
+        const installResult = await fcmd(
+            resolvedPackage.packageManager,
+            ...resolvedPackageManager.install,
+            packageName,
+        ).run()
+        if (installResult.isErr()) {
+            const { code, output } = installResult.error
 
-        logError(`Failed to install ${packageName}. Got exit code: ${code}`)
-        logFatal(output)
+            logError(`Failed to install ${packageName}. Got exit code: ${code}`)
+            logFatal(output)
+        }
     }
-    logSuccess(`Installed ${packageName}`)
+    logSuccess(`${leftPad}INST  ${packageName}`)
 }

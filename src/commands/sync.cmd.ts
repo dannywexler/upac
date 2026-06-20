@@ -11,8 +11,6 @@ import {
 import { logInfo, logSuccess, logWarning } from "$/logging"
 import { expectResult, indent } from "$/utils"
 
-const leftPad = indent()
-
 export async function syncCommand() {
     await readVariablesFile()
     const { packages } = useUpacConfig()
@@ -44,7 +42,9 @@ export async function syncCommand() {
         }
         const packageDestinationFolder = configFolder(packageName)
 
-        logInfo(`Syncing dotfiles to ${packageDestinationFolder.path}:`)
+        logInfo(
+            `${indent(2)}Syncing dotfiles to ${packageDestinationFolder.path}:`,
+        )
 
         const foundFiles = await expectResult(
             packageFolder.findFiles(),
@@ -54,21 +54,11 @@ export async function syncCommand() {
             logWarning(`${packageFolder.path} is an empty folder. Skipping.`)
         }
 
-        let longestFileName = 1
-        for (const foundFile of foundFiles) {
-            const len = foundFile
-                .path()
-                .slice(packageFolder.path.length + 1).length
-            if (len > longestFileName) {
-                longestFileName = len
-            }
-        }
+        const leftPad = indent()
 
         for (const foundFile of foundFiles) {
-            const relative = foundFile
-                .path()
-                .slice(packageFolder.path.length + 1)
-                .padEnd(longestFileName + 2)
+            const relativePath = foundFile.relativePath(packageFolder)
+            let destinationFile = packageDestinationFolder.file(relativePath)
 
             if (foundFile.ext() === "liquid") {
                 const foundFileText = await expectResult(
@@ -79,35 +69,29 @@ export async function syncCommand() {
                     safeRenderTemplate(foundFileText),
                     () => `${leftPad}Error rendering ${foundFile.path()}`,
                 )
-                const destinationFile = packageDestinationFolder.file(
-                    // use -1 to slice off ".liquid" from end of file path
-                    relative
-                        .trim()
-                        .slice(0, LIQUID_SUFFIX_LENGTH * -1),
+                destinationFile = packageDestinationFolder.file(
+                    relativePath.slice(0, LIQUID_SUFFIX_LENGTH * -1),
                 )
                 await expectResult(
                     destinationFile.writeText(renderedText),
-                    () => `${leftPad}Error writing ${foundFile.path()}`,
-                )
-                logSuccess(`${leftPad}${relative}RENDERED`)
-
-                continue
-            }
-
-            if (OS_INFO.isWindows) {
-                await expectResult(
-                    foundFile.copyTo(packageDestinationFolder),
                     () =>
-                        `${leftPad}Error copying ${foundFile.path()} into ${packageDestinationFolder.path}`,
+                        `${leftPad}Error writing rendered text into file: ${destinationFile.path()}`,
                 )
-                logSuccess(`${leftPad}${relative}COPIED`)
+                logSuccess(`${leftPad}REND  ${relativePath}`)
+            } else if (OS_INFO.isWindows) {
+                await expectResult(
+                    foundFile.copyTo(destinationFile),
+                    () =>
+                        `${leftPad}Error copying ${foundFile.path()} to ${destinationFile.path()}`,
+                )
+                logSuccess(`${leftPad}COPY  ${relativePath}`)
             } else {
                 await expectResult(
-                    foundFile.symlinkTo(packageDestinationFolder),
+                    foundFile.symlinkTo(destinationFile),
                     () =>
-                        `${leftPad}Error symlinking ${foundFile.path()} into ${packageDestinationFolder.path}`,
+                        `${leftPad}Error symlinking ${foundFile.path()} to ${destinationFile.path()}`,
                 )
-                logSuccess(`${leftPad}${relative}SYMLINKED`)
+                logSuccess(`${leftPad}SLNK  ${relativePath}`)
             }
         }
     }

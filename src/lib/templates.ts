@@ -24,7 +24,7 @@ import {
 import type { LiquidError } from "liquidjs"
 import { Liquid } from "liquidjs"
 import { fromAsyncThrowable } from "neverthrow"
-import { stringifyYAML } from "zerde"
+import { parseYAML, stringifyYAML } from "zerde"
 import z from "zod"
 
 import { upacVariablesFile } from "$/config/config.impl"
@@ -127,10 +127,10 @@ export async function readVariablesFile() {
     )
     let unknownParsedContents: unknown
     try {
-        unknownParsedContents = JSON.parse(unknownFileContents)
+        unknownParsedContents = parseYAML(unknownFileContents)
     } catch (err) {
         const error = err as SyntaxError
-        logError(`${variablesFile} was not valid JSON`)
+        logError(`${variablesFile} was not valid YAML`)
         logFatal(`${error.name}: ${error.message}`)
     }
 
