@@ -1,8 +1,10 @@
 {
-    "name": "upac",
+    "name": "upac-cli",
     "version": "0.1.0",
     "description": "Universal Package Manager and dotfile syncing cli",
-    "bin": "./dist/index.js",
+    "bin": {
+        "upac": "dist/index.js"
+    },
     "keywords": [
         "universal",
         "package manager",
